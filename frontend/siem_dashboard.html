@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI-Powered Mini SIEM Platform: Real-Time Network Threat Classification &amp; Incident Response System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="AI-Powered Mini SIEM Platform: Real-Time Network Threat Classification and Incident Response System">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #06090A;
+    --panel: #0D1416;
+    --panel-2: #121C1F;
+    --panel-hover: #162327;
+    --grid: #182629;
+    --text: #DCF2ED;
+    --dim: #597B79;
+    --dimmer: #334846;
+    --phos: #00FF9D;
+    --phos-dim: #104C36;
+    --amber: #FFB74D;
+    --red: #FF4949;
+    --blue: #4D9FFF;
+    --purple: #B388FF;
+    --sidebar-w: 240px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100%; overflow: hidden; }
+  body {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-attachment: fixed;
+    font-size: 13.5px;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  ::selection { background: var(--phos); color: #000; }
+  button, input, select, a { font-family: inherit; }
+
+  /* ==========================================
+     VIEWS & CONTAINER
+     ========================================== */
+  .view { display: none; height: 100vh; width: 100vw; }
+  .view.active { display: flex; }
+
+  /* ==========================================
+     LOGIN VIEW (Cyberpunk Authentication Screen)
+     ========================================== */
+  #view-login {
+    align-items: center; justify-content: center; background: radial-gradient(circle at center, #0F1D20 0%, #06090A 75%);
+    position: relative; overflow: hidden;
+  }
+  .login-card {
+    background: rgba(13, 20, 22, 0.85); backdrop-filter: blur(12px);
+    border: 1px solid var(--grid); border-top: 2px solid var(--phos);
+    padding: 38px 42px; border-radius: 8px; width: 380px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,255,157,0.1);
+    display: flex; flex-direction: column; gap: 20px; z-index: 2;
+  }
+  .login-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .login-mark {
+    width: 48px; height: 48px; border: 2px solid var(--phos); border-radius: 50%;
+    position: relative; background: rgba(0,255,157,0.06);
+  }
+  .login-mark::after {
+    content: ""; position: absolute; inset: 12px; border-radius: 50%;
+    background: var(--phos); box-shadow: 0 0 16px 3px var(--phos);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .login-brand h1 { font-family: 'IBM Plex Mono', monospace; font-size: 24px; letter-spacing: 3px; font-weight: 700; }
+  .login-brand h1 span { color: var(--phos); }
+  .login-brand .sub { font-size: 11px; color: var(--dim); letter-spacing: 1.5px; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .form-group input {
+    background: var(--panel-2); border: 1px solid var(--grid); color: var(--text);
+    padding: 10px 12px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus { border-color: var(--phos); outline: none; box-shadow: 0 0 8px rgba(0,255,157,0.2); }
+
+  .btn-login {
+    background: var(--phos); color: #06090A; border: none; padding: 11px; font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 1.5px;
+    border-radius: 4px; cursor: pointer; text-transform: uppercase; transition: transform 0.15s, background 0.15s;
+    margin-top: 6px;
+  }
+  .btn-login:hover { background: #33FFB0; transform: translateY(-1px); box-shadow: 0 0 15px rgba(0,255,157,0.4); }
+  .btn-demo {
+    background: transparent; color: var(--dim); border: 1px dashed var(--grid); padding: 8px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; border-radius: 4px; cursor: pointer;
+    text-transform: uppercase; transition: 0.15s;
+  }
+  .btn-demo:hover { border-color: var(--phos); color: var(--phos); }
+
+  /* ==========================================
+     MAIN APP SHELL (Sidebar + Header + Page Content)
+     ========================================== */
+  #view-app { flex-direction: row; }
+
+  /* ---- SIDEBAR ---- */
+  .sidebar {
+    width: var(--sidebar-w); background: var(--panel); border-right: 1px solid var(--grid);
+    display: flex; flex-direction: column; flex-shrink: 0; justify-content: space-between;
+  }
+  .sidebar-top { display: flex; flex-direction: column; }
+  .sidebar-brand {
+    padding: 20px 18px; border-bottom: 1px solid var(--grid); display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-brand .mini-mark {
+    width: 24px; height: 24px; border: 1.5px solid var(--phos); border-radius: 50%;
+    position: relative; flex-shrink: 0;
+  }
+  .sidebar-brand .mini-mark::after {
+    content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--phos);
+  }
+  .sidebar-brand h2 { font-family: 'IBM Plex Mono', monospace; font-size: 16px; letter-spacing: 1.5px; font-weight: 700; }
+  .sidebar-brand h2 span { color: var(--phos); }
+
+  .nav-list { list-style: none; display: flex; flex-direction: column; padding: 14px 10px; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    border-radius: 4px; color: var(--dim); cursor: pointer; font-weight: 500; font-size: 13px;
+    transition: all 0.15s ease; user-select: none;
+  }
+  .nav-item:hover { background: var(--panel-2); color: var(--text); }
+  .nav-item.active { background: rgba(0,255,157,0.08); color: var(--phos); font-weight: 600; border-left: 3px solid var(--phos); }
+  .nav-item .nav-left { display: flex; align-items: center; gap: 10px; }
+  .nav-item .icon { font-size: 14px; width: 16px; text-align: center; }
+  .nav-item .nav-badge {
+    background: var(--grid); color: var(--text); font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; padding: 2px 6px; border-radius: 10px;
+  }
+  .nav-item.active .nav-badge { background: var(--phos-dim); color: var(--phos); }
+
+  .sidebar-user {
+    padding: 16px 14px; border-top: 1px solid var(--grid); background: var(--panel-2);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .user-info { display: flex; flex-direction: column; gap: 2px; }
+  .user-info .name { font-weight: 600; font-size: 12.5px; color: var(--text); }
+  .user-info .role { font-size: 10.5px; color: var(--dim); }
+  .btn-logout {
+    background: none; border: 1px solid var(--grid); color: var(--dim); padding: 5px 10px;
+    border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+    cursor: pointer; text-transform: uppercase; transition: 0.15s;
+  }
+  .btn-logout:hover { border-color: var(--red); color: var(--red); background: rgba(255,73,73,0.08); }
+
+  /* ---- MAIN CONTENT AREA ---- */
+  .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; }
+
+  /* ---- HEADER ---- */
+  .top-header {
+    height: 56px; background: var(--panel); border-bottom: 1px solid var(--grid);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0;
+  }
+  .header-title { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; letter-spacing: 1px; color: var(--text); }
+  .status-cluster { display: flex; gap: 24px; align-items: center; }
+  .status-item { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .status-item .label { font-size: 9.5px; color: var(--dim); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; }
+  .status-item .val { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.green { background: var(--phos); box-shadow: 0 0 6px var(--phos); }
+  .dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dot.red { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .clock { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--dim); }
+
+  /* ---- PAGES ---- */
+  .page-container { flex: 1; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .page { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.25s ease; }
+  .page.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ==========================================
+     COMMON PANELS & UI COMPONENTS
+     ========================================== */
+  .panel {
+    background: var(--panel); border: 1px solid var(--grid); padding: 18px 20px;
+    display: flex; flex-direction: column; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--grid);
+  }
+  .panel-head h3 {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--dim); font-weight: 600;
+  }
+  .panel-head .count { font-family: 'IBM Plex Mono', monospace; color: var(--phos); font-size: 12px; }
+
+  /* BADGES */
+  .badge {
+    padding: 2px 8px; border-radius: 2px; font-size: 10px; letter-spacing: .5px; text-align: center;
+    font-weight: 600; text-transform: uppercase; display: inline-block;
+  }
+  .badge.low { background: rgba(77,159,255,.12); color: var(--blue); border: 1px solid rgba(77,159,255,.3); }
+  .badge.medium { background: rgba(255,183,77,.12); color: var(--amber); border: 1px solid rgba(255,183,77,.3); }
+  .badge.high { background: rgba(255,73,73,.12); color: var(--red); border: 1px solid rgba(255,73,73,.35); }
+  .badge.critical { background: var(--red); color: #06090A; border: 1px solid var(--red); font-weight: 700; box-shadow: 0 0 8px rgba(255,73,73,0.5); }
+
+  /* BUTTONS & CONTROLS */
+  .btn {
+    background: var(--panel-2); border: 1px solid var(--grid); color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 6px 14px;
+    border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; text-transform: uppercase; transition: 0.15s; text-decoration: none; display: inline-block;
+  }
+  .btn:hover { border-color: var(--phos); color: var(--phos); }
+  .btn.btn-danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,73,73,0.1); }
+  .btn.active { border-color: var(--phos); color: var(--phos); background: rgba(0,255,157,0.06); }
+
+  /* TABLES */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--grid);
+  }
+  tbody td { padding: 10px 8px; border-bottom: 1px solid var(--grid); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  tbody tr:hover { background: rgba(0,255,157,0.02); }
+  .conf-bar { width: 50px; height: 4px; background: var(--grid); position: relative; display: inline-block; vertical-align: middle; margin-right: 6px; border-radius: 2px; overflow: hidden; }
+  .conf-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--phos); }
+
+  select.status-select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--grid); font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; padding: 4px 6px; border-radius: 2px; cursor: pointer; transition: border-color 0.15s;
+  }
+  select.status-select:focus, select.status-select:hover { border-color: var(--phos); outline: none; }
+
+  /* ==========================================
+     PAGE 1: OVERVIEW DASHBOARD
+     ========================================== */
+  .grid-overview { display: grid; grid-template-columns: 280px 1fr 320px; gap: 20px; }
+  .meter-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; }
+  .meter-label { font-size: 11px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; font-weight: 600; }
+  .meter-value { font-family: 'IBM Plex Mono', monospace; font-size: 40px; font-weight: 700; color: var(--amber); text-shadow: 0 0 12px rgba(255,183,77,0.3); }
+  .meter-bar { width: 100%; height: 8px; background: var(--grid); position: relative; overflow: hidden; border-radius: 4px; }
+  .meter-fill { height: 100%; background: linear-gradient(90deg, var(--phos), var(--amber), var(--red)); width: 35%; transition: width 0.8s ease; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+  .stat-card {
+    background: var(--panel-2); border: 1px solid var(--grid); padding: 12px 14px; border-radius: 4px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-card .lbl { font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text); }
+
+  /* ==========================================
+     PAGE 2: LIVE STREAM
+     ========================================== */
+  .stream-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .stream-table-wrap { max-height: 580px; overflow-y: auto; border: 1px solid var(--grid); border-radius: 4px; }
+  .feed-row-anim { animation: fadeIn 0.3s forwards; }
+
+  /* ==========================================
+     PAGE 3: ALERT STREAM
+     ========================================== */
+  .alerts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .alert-card {
+    border: 1px solid var(--grid); border-left: 4px solid var(--red); background: var(--panel-2);
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 4px;
+  }
+  .alert-card.critical { border-left-color: var(--red); background: rgba(255,73,73,0.06); }
+  .alert-card.high { border-left-color: var(--red); }
+  .alert-card.medium { border-left-color: var(--amber); }
+  .alert-card.low { border-left-color: var(--blue); }
+
+  /* ==========================================
+     PAGE 4: INCIDENT LOG
+     ========================================== */
+  .incident-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .search-box input {
+    background: var(--panel-2); border: 1px solid var(--grid); color: var(--text);
+    padding: 6px 12px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; width: 220px;
+  }
+
+  /* ==========================================
+     PAGE 5: TELEMETRY & ANALYTICS
+     ========================================== */
+  .top-ips { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .top-ips li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; }
+  .top-ips .ip { font-family: 'IBM Plex Mono', monospace; color: var(--text); }
+  .top-ips .bar-track { flex: 1; height: 6px; background: var(--grid); margin: 0 12px; position: relative; border-radius: 3px; overflow: hidden; }
+  .top-ips .bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--red); transition: width 0.5s ease; }
+  .top-ips .n { font-family: 'IBM Plex Mono', monospace; color: var(--dim); width: 32px; text-align: right; }
+
+  /* ==========================================
+     PAGE 6: MODEL & HEALTH
+     ========================================== */
+  .model-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+  /* ==========================================
+     PAGE 8: PRINTABLE PDF SECURITY REPORT STYLES
+     ========================================== */
+  .report-document {
+    background: #ffffff; color: #111111; padding: 36px 40px; border-radius: 6px;
+    font-family: 'Inter', sans-serif; display: flex; flex-direction: column; gap: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .report-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 2px solid #111111; padding-bottom: 16px;
+  }
+  .report-brand h1 { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 700; color: #000; letter-spacing: 2px; }
+  .report-brand h1 span { color: #00AA66; }
+  .report-brand .sub { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+  .report-meta { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #444; }
+
+  .report-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .report-box { background: #F4F7F6; border: 1px solid #E0E6E4; padding: 14px 16px; border-radius: 4px; }
+  .report-box .lbl { font-size: 11px; text-transform: uppercase; color: #666; font-family: 'IBM Plex Mono', monospace; }
+  .report-box .val { font-size: 22px; font-weight: 700; color: #111; font-family: 'IBM Plex Mono', monospace; margin-top: 4px; }
+
+  .report-section h3 {
+    font-family: 'IBM Plex Mono', monospace; font-size: 14px; text-transform: uppercase;
+    color: #111; border-bottom: 1px solid #DDD; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 1px;
+  }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #222; }
+  .report-table th { background: #EAEFEF; color: #111; text-align: left; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; font-size: 10px; }
+  .report-table td { padding: 8px 10px; border-bottom: 1px solid #EEE; font-family: 'IBM Plex Mono', monospace; }
+
+  .report-footer {
+    margin-top: 24px; padding-top: 16px; border-top: 1px solid #DDD;
+    display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #666;
+  }
+
+  /* PRINT MEDIA OVERRIDES FOR PDF EXPORT */
+  @media print {
+    body { background: #fff !important; color: #000 !important; overflow: visible !important; }
+    .sidebar, .top-header, .btn, .stream-controls, .search-box, .toast-container { display: none !important; }
+    #view-login { display: none !important; }
+    #view-app { display: block !important; }
+    .main-area { height: auto !important; width: 100% !important; }
+    .page-container { padding: 0 !important; overflow: visible !important; }
+    .page { display: none !important; }
+    .page#page-reports { display: flex !important; }
+    .report-document { box-shadow: none !important; padding: 0 !important; border: none !important; }
+  }
+
+  /* TOAST NOTIFICATIONS */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+  .toast {
+    background: var(--panel-2); border: 1px solid var(--phos); color: var(--text);
+    padding: 10px 16px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); animation: toastIn 0.3s ease;
+  }
+  @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--grid); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ==========================================
+     VIEW 1: LOGIN PORTAL
+     ========================================== -->
+<div class="view active" id="view-login">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-mark"></div>
+      <div>
+        <h1>AI-POWERED<span>://</span>SIEM</h1>
+        <div class="sub">REAL-TIME NETWORK THREAT CLASSIFICATION &amp; INCIDENT RESPONSE SYSTEM</div>
+      </div>
+    </div>
+
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Analyst Username</label>
+        <input type="text" id="login-username" value="analyst" required>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Security Key</label>
+        <input type="password" id="login-password" value="sentry2026" required>
+      </div>
+      <button type="submit" class="btn-login" style="width:100%;">Authenticate Session &rarr;</button>
+    </form>
+    <button type="button" class="btn-demo" onclick="quickDemoLogin()">⚡ One-Click Analyst Sign-In</button>
+  </div>
+</div>
+
+<!-- ==========================================
+     VIEW 2: MAIN MULTI-PAGE APPLICATION
+     ========================================== -->
+<div class="view" id="view-app">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-brand">
+        <div class="mini-mark"></div>
+        <h2>AI-SIEM<span>://</span>PLATFORM</h2>
+      </div>
+
+      <ul class="nav-list">
+        <li class="nav-item active" data-page="page-overview" onclick="switchPage('page-overview', this)">
+          <div class="nav-left"><span class="icon">📊</span><span>Overview</span></div>
+        </li>
+        <li class="nav-item" data-page="page-stream" onclick="switchPage('page-stream', this)">
+          <div class="nav-left"><span class="icon">📡</span><span>Live Stream</span></div>
+          <span class="nav-badge" id="nav-count-flows">0</span>
+        </li>
+        <li class="nav-item" data-page="page-alerts" onclick="switchPage('page-alerts', this)">
+          <div class="nav-left"><span class="icon">🚨</span><span>Alert Stream</span></div>
+          <span class="nav-badge" id="nav-count-alerts">0</span>
+        </li>
+        <li class="nav-item" data-page="page-incidents" onclick="switchPage('page-incidents', this)">
+          <div class="nav-left"><span class="icon">📋</span><span>Incident Log</span></div>
+          <span class="nav-badge" id="nav-count-incidents">0</span>
+        </li>
+        <li class="nav-item" data-page="page-csv" onclick="switchPage('page-csv', this)">
+          <div class="nav-left"><span class="icon">📁</span><span>CSV Analysis</span></div>
+        </li>
+        <li class="nav-item" data-page="page-reports" onclick="switchPage('page-reports', this)">
+          <div class="nav-left"><span class="icon">📑</span><span>Reports &amp; PDF</span></div>
+        </li>
+        <li class="nav-item" data-page="page-analytics" onclick="switchPage('page-analytics', this)">
+          <div class="nav-left"><span class="icon">📈</span><span>Attacker Telemetry</span></div>
+        </li>
+        <li class="nav-item" data-page="page-health" onclick="switchPage('page-health', this)">
+          <div class="nav-left"><span class="icon">⚙️</span><span>Model &amp; Diagnostics</span></div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-info">
+        <span class="name" id="user-display-name">Tier-3 SOC Analyst</span>
+        <span class="role" id="user-display-role">admin@sentry.sec</span>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()">Sign Out ↵</button>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <div class="main-area">
+
+    <!-- HEADER -->
+    <header class="top-header">
+      <div class="header-title" id="page-title">Executive Threat Overview</div>
+      <div class="status-cluster">
+        <div class="status-item">
+          <div class="label"><span class="dot green" id="pipeline-dot"></span>Ingest Pipeline</div>
+          <div class="val" id="pipeline-status">STREAMING</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Classifier Model</div>
+          <div class="val mono" id="model-name">XGBoost-v1</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Flows / Sec</div>
+          <div class="val" id="flow-rate">0</div>
+        </div>
+        <div class="clock" id="clock">--:--:--</div>
+      </div>
+    </header>
+
+    <!-- PAGE CONTAINER -->
+    <div class="page-container">
+
+      <!-- ==========================================
+           PAGE 1: EXECUTIVE OVERVIEW
+           ========================================== -->
+      <div class="page active" id="page-overview">
+        <div class="grid-overview">
+
+          <!-- Left: Threat Level Gauge -->
+          <div class="panel">
+            <div class="panel-head"><h3>Threat Level Meter</h3></div>
+            <div class="meter-wrap">
+              <div class="meter-value" id="threat-level-val">32</div>
+              <div class="meter-label" id="threat-level-label">MODERATE</div>
+              <div class="meter-bar"><div class="meter-fill" id="threat-meter-fill"></div></div>
+            </div>
+
+            <div class="stat-grid">
+              <div class="stat-card">
+                <span class="lbl">Active Incidents</span>
+                <span class="val" id="stat-active">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="lbl">Flows Classified</span>
+                <span class="val" id="stat-flows">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="lbl">Blocked IPs</span>
+                <span class="val" id="stat-blocked">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="lbl">Accuracy</span>
+                <span class="val" style="color:var(--phos)">78.1%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center: Threat Radar -->
+          <div class="panel" style="display:flex; flex-direction:row; gap:20px; align-items:center;">
+            <canvas id="radar" width="190" height="190"></canvas>
+            <div class="legend" id="radar-legend" style="flex:1;"></div>
+          </div>
+
+          <!-- Right: Top Attacker IPs Preview -->
+          <div class="panel">
+            <div class="panel-head"><h3>Top Attacker IPs</h3></div>
+            <ul class="top-ips" id="overview-top-ips">
+              <li style="color:var(--dim); font-size:11px;">Loading telemetry...</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <!-- Bottom: Recent Stream Preview -->
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Recent Network Telemetry</h3>
+            <button class="btn" onclick="switchPage('page-stream', document.querySelector('[data-page=page-stream]'))">Open Full Stream &rarr;</button>
+          </div>
+          <div style="max-height:220px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr><th>Time</th><th>Source IP</th><th>Dest IP:Port</th><th>Protocol</th><th>Threat Category</th><th>Severity</th></tr>
+              </thead>
+              <tbody id="overview-feed-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 2: DEDICATED LIVE STREAM
+           ========================================== -->
+      <div class="page" id="page-stream">
+        <div class="panel">
+          <div class="stream-controls">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button class="btn active" id="btn-pause-stream" onclick="toggleStreamPause()">Pause Stream</button>
+              <button class="btn" onclick="clearStream()">Clear Buffer</button>
+              <span style="color:var(--dim); font-size:12px; margin-left:10px;">Protocol:</span>
+              <button class="btn active" onclick="filterProtocol('ALL', this)">ALL</button>
+              <button class="btn" onclick="filterProtocol('TCP', this)">TCP</button>
+              <button class="btn" onclick="filterProtocol('UDP', this)">UDP</button>
+            </div>
+            <span class="count" id="stream-total-count">0 flows captured</span>
+          </div>
+
+          <div class="stream-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th><th>Source IP</th><th>Dest IP</th><th>Port</th><th>Protocol</th>
+                  <th>Classification</th><th>ML Confidence</th><th>Severity</th><th>Action Recommendation</th>
+                </tr>
+              </thead>
+              <tbody id="full-stream-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 3: ALERT STREAM & TRIAGE
+           ========================================== -->
+      <div class="page" id="page-alerts">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Active Threat Alerts</h3>
+            <div style="display:flex; gap:8px;">
+              <button class="btn active" onclick="filterAlerts('all', this)">All</button>
+              <button class="btn" onclick="filterAlerts('critical', this)">Critical</button>
+              <button class="btn" onclick="filterAlerts('high', this)">High</button>
+              <button class="btn" onclick="filterAlerts('medium', this)">Medium</button>
+            </div>
+          </div>
+
+          <div class="alerts-grid" id="full-alerts-grid">
+            <div style="color:var(--dim); font-size:12px; padding:20px 0;">No active security alerts pending review.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 4: INCIDENT MANAGEMENT LOG
+           ========================================== -->
+      <div class="page" id="page-incidents">
+        <div class="panel">
+          <div class="incident-toolbar">
+            <div style="display:flex; gap:8px;">
+              <button class="btn active" onclick="filterIncidents('all', this)">All</button>
+              <button class="btn" onclick="filterIncidents('open', this)">Open</button>
+              <button class="btn" onclick="filterIncidents('investigating', this)">Investigating</button>
+              <button class="btn" onclick="filterIncidents('resolved', this)">Resolved</button>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div class="search-box">
+                <input type="text" id="incident-search" placeholder="Search IP or Threat..." oninput="renderIncidentsTable()">
+              </div>
+              <a href="/api/export-incidents-csv" class="btn" download>📥 Export Incidents CSV</a>
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Timestamp</th><th>Source IP</th><th>Dest IP:Port</th><th>Threat Type</th>
+                  <th>Confidence</th><th>Severity</th><th>Correlated</th><th>Status</th><th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="incident-table-body">
+                <tr><td colspan="10" style="color:var(--dim); text-align:center; padding:24px;">Loading incidents...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 5: CSV BATCH ANALYSIS SYSTEM
+           ========================================== -->
+      <div class="page" id="page-csv">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Batch Network Flow CSV Classification Engine</h3>
+            <a href="/api/sample-csv" class="btn" download>📥 Download Sample Network CSV</a>
+          </div>
+
+          <div id="dropzone" style="border: 2px dashed var(--grid); padding: 36px 20px; text-align: center; border-radius: 6px; background: var(--panel-2); cursor: pointer; transition: 0.2s;" onclick="document.getElementById('csv-file-input').click()">
+            <div style="font-size: 32px; margin-bottom: 8px;">📁</div>
+            <div style="font-weight: 600; font-size: 14px; color: var(--text);">Drop Network Flow CSV File Here or Click to Upload</div>
+            <div style="color: var(--dim); font-size: 11px; margin-top: 6px;">Supports NSL-KDD formatted CSVs (41 features) or raw network flow logs</div>
+            <input type="file" id="csv-file-input" accept=".csv" style="display:none;" onchange="uploadCSVFile(this.files[0])">
+          </div>
+
+          <div id="csv-results-area" style="display:none; margin-top:20px; flex-direction:column; gap:16px;">
+            <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+              <div class="stat-card"><span class="lbl">Total Rows Analyzed</span><span class="val" id="csv-stat-total">0</span></div>
+              <div class="stat-card"><span class="lbl">Malicious Threats</span><span class="val" id="csv-stat-malicious" style="color:var(--red);">0</span></div>
+              <div class="stat-card"><span class="lbl">Normal Traffic</span><span class="val" id="csv-stat-normal" style="color:var(--phos);">0</span></div>
+              <div class="stat-card"><span class="lbl">Malicious Ratio</span><span class="val" id="csv-stat-ratio" style="color:var(--amber);">0%</span></div>
+            </div>
+
+            <div class="panel-head" style="margin-top:10px;">
+              <h3>Classified Batch Preview (Top 200 Rows)</h3>
+            </div>
+
+            <div style="max-height:420px; overflow-y:auto; border:1px solid var(--grid); border-radius:4px;">
+              <table>
+                <thead>
+                  <tr><th>Row #</th><th>Source IP</th><th>Dest IP:Port</th><th>Predicted Threat</th><th>ML Confidence</th><th>Severity</th><th>Action Recommendation</th></tr>
+                </thead>
+                <tbody id="csv-results-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 6: SECURITY REPORTS & PDF EXPORT
+           ========================================== -->
+      <div class="page" id="page-reports">
+        <div class="panel" style="margin-bottom: 10px;">
+          <div class="panel-head">
+            <h3>Security Report &amp; PDF Export Generator</h3>
+            <div style="display:flex; gap:10px;">
+              <button class="btn active" onclick="exportPDFReport()">📄 Export PDF Report</button>
+              <button class="btn" onclick="fetchReportData()">🔄 Refresh Data</button>
+            </div>
+          </div>
+
+          <div class="report-document" id="printable-report">
+            <div class="report-header">
+              <div class="report-brand">
+                <h1>AI-POWERED<span>://</span>MINI SIEM</h1>
+                <div class="sub">Real-Time Network Threat Classification and Incident Response System</div>
+              </div>
+              <div class="report-meta">
+                <div><strong>GENERATED:</strong> <span id="rpt-date">--</span></div>
+                <div><strong>MODEL:</strong> <span id="rpt-model">XGBoost-v1</span></div>
+                <div><strong>ANALYST:</strong> <span id="rpt-analyst">Tier-3 SOC Analyst</span></div>
+              </div>
+            </div>
+
+            <div class="report-grid-3">
+              <div class="report-box">
+                <div class="lbl">Total Incidents</div>
+                <div class="val" id="rpt-stat-total">0</div>
+              </div>
+              <div class="report-box">
+                <div class="lbl">Open Threats</div>
+                <div class="val" id="rpt-stat-open" style="color:#D32F2F;">0</div>
+              </div>
+              <div class="report-box">
+                <div class="lbl">Resolved Incidents</div>
+                <div class="val" id="rpt-stat-resolved" style="color:#388E3C;">0</div>
+              </div>
+            </div>
+
+            <div class="report-section">
+              <h3>Threat Classification Breakdown</h3>
+              <table class="report-table">
+                <thead>
+                  <tr><th>Threat Category</th><th>Incident Count</th><th>Percentage</th><th>Risk Level</th></tr>
+                </thead>
+                <tbody id="rpt-table-breakdown">
+                  <tr><td colspan="4">Loading report telemetry...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="report-section">
+              <h3>Top Malicious Attacker IPs</h3>
+              <table class="report-table">
+                <thead>
+                  <tr><th>Source IP Address</th><th>Attack Flow Volume</th><th>Primary Target Vector</th></tr>
+                </thead>
+                <tbody id="rpt-table-ips">
+                  <tr><td colspan="3">Loading top attacker IPs...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="report-section">
+              <h3>Recent High-Severity Incidents</h3>
+              <table class="report-table">
+                <thead>
+                  <tr><th>ID</th><th>Timestamp</th><th>Source IP</th><th>Dest IP:Port</th><th>Threat Type</th><th>Severity</th><th>Status</th></tr>
+                </thead>
+                <tbody id="rpt-table-incidents">
+                  <tr><td colspan="7">Loading recent incidents...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="report-footer">
+              <div>SENTRY AI Security Operations Center · Confidential Audit Document</div>
+              <div>Certified by XGBoost Machine Learning Pipeline (78.1% Benchmark Accuracy)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 7: ATTACKER TELEMETRY & ANALYTICS
+           ========================================== -->
+      <div class="page" id="page-analytics">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+          <div class="panel">
+            <div class="panel-head"><h3>Top Malicious Source IPs</h3></div>
+            <ul class="top-ips" id="analytics-top-ips">
+              <li style="color:var(--dim);">Loading analytics...</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h3>Rules Engine Correlation Triggers</h3></div>
+            <div style="display:flex; flex-direction:column; gap:12px; font-size:12.5px;">
+              <div style="background:var(--panel-2); border:1px solid var(--grid); padding:12px; border-radius:4px;">
+                <div style="font-weight:600; color:var(--amber); margin-bottom:4px;">Rule #1: Repeated Port Scan Campaign</div>
+                <div style="color:var(--dim);">Escalates severity to <span class="badge critical">CRITICAL</span> when 3+ port scan or brute force flows originate from the same source IP within a 60s window.</div>
+              </div>
+              <div style="background:var(--panel-2); border:1px solid var(--grid); padding:12px; border-radius:4px;">
+                <div style="font-weight:600; color:var(--phos); margin-bottom:4px;">Rule #2: High-Confidence DDoS Threshold</div>
+                <div style="color:var(--dim);">Flags connection reset floods with >99% confidence directly for automated firewall blocking suggestions.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           PAGE 8: MODEL DIAGNOSTICS & HEALTH
+           ========================================== -->
+      <div class="page" id="page-health">
+        <div class="model-card-grid">
+          <div class="panel">
+            <div class="panel-head"><h3>XGBoost Model Benchmark</h3></div>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+              <div><strong>Accuracy:</strong> <span style="color:var(--phos)">78.1%</span></div>
+              <div><strong>Macro F1 Score:</strong> <span style="color:var(--amber)">0.566</span></div>
+              <div><strong>ROC-AUC (macro, OVR):</strong> <span style="color:var(--phos)">0.948</span></div>
+              <div style="color:var(--dim); font-size:12px; margin-top:6px;">Trained on standard NSL-KDD benchmark dataset (125,973 train rows / 22,544 test rows).</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h3>Random Forest Comparison</h3></div>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+              <div><strong>Accuracy:</strong> 73.9%</div>
+              <div><strong>Macro F1 Score:</strong> 0.479</div>
+              <div><strong>ROC-AUC (macro, OVR):</strong> 0.934</div>
+              <div style="color:var(--dim); font-size:12px; margin-top:6px;">Backup classifier model available in <code>models/rf_model.joblib</code>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>NSL-KDD 41 Normalized Feature Attributes</h3></div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); line-height:1.6; word-break:break-all;">
+            duration, protocol_type, service, flag, src_bytes, dst_bytes, land, wrong_fragment, urgent, hot, num_failed_logins, logged_in, num_compromised, root_shell, su_attempted, num_root, num_file_creations, num_shells, num_access_files, num_outbound_cmds, is_host_login, is_guest_login, count, srv_count, serror_rate, srv_serror_rate, rerror_rate, srv_rerror_rate, same_srv_rate, diff_srv_rate, srv_diff_host_rate, dst_host_count, dst_host_srv_count, dst_host_same_srv_rate, dst_host_diff_srv_rate, dst_host_same_src_port_rate, dst_host_srv_diff_host_rate, dst_host_serror_rate, dst_host_srv_serror_rate, dst_host_rerror_rate, dst_host_srv_rerror_rate
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ---------------- DYNAMIC ROUTING & SYSTEM STATE ---------------- */
+const isHttp = window.location.protocol.startsWith('http');
+const API_BASE = isHttp ? '' : 'http://localhost:8000';
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = isHttp ? `${WS_PROTOCOL}//${window.location.host}/ws/stream` : 'ws://localhost:8000/ws/stream';
+
+const THREAT_COLORS = { 'Normal': '#00FF9D', 'DDoS': '#FF4949', 'Port Scan': '#4D9FFF', 'Brute Force': '#FFB74D', 'Botnet C2': '#B388FF' };
+const threatCounts = { 'Normal': 0, 'DDoS': 0, 'Port Scan': 0, 'Brute Force': 0, 'Botnet C2': 0 };
+
+let blockedIPs = new Set();
+let totalFlows = 0;
+let flowRateWindow = [];
+let openAlerts = 0;
+let streamPaused = false;
+let selectedProtocol = 'ALL';
+let incidentList = [];
+let currentIncidentFilter = 'all';
+let currentAlertFilter = 'all';
+let socket = null;
+
+/* ---------------- AUTHENTICATION & SESSION ---------------- */
+function handleLogin(e) {
+  e.preventDefault();
+  const u = document.getElementById('login-username').value || 'analyst';
+  sessionStorage.setItem('sentry_logged_in', 'true');
+  sessionStorage.setItem('sentry_user', u);
+  startSession(u);
+}
+
+function quickDemoLogin() {
+  sessionStorage.setItem('sentry_logged_in', 'true');
+  sessionStorage.setItem('sentry_user', 'SOC Analyst');
+  startSession('SOC Analyst');
+}
+
+function startSession(username) {
+  document.getElementById('user-display-name').textContent = username;
+  document.getElementById('view-login').classList.remove('active');
+  document.getElementById('view-app').classList.add('active');
+  showToast(`Welcome back, ${username}. Connected to SENTRY SIEM.`);
+  initApp();
+}
+
+function handleLogout() {
+  sessionStorage.clear();
+  document.getElementById('view-app').classList.remove('active');
+  document.getElementById('view-login').classList.add('active');
+  if (socket) socket.close();
+}
+
+if (sessionStorage.getItem('sentry_logged_in') === 'true') {
+  startSession(sessionStorage.getItem('sentry_user') || 'SOC Analyst');
+}
+
+/* ---------------- MULTI-PAGE NAVIGATION ---------------- */
+function switchPage(pageId, navEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const targetPage = document.getElementById(pageId);
+  if (targetPage) targetPage.classList.add('active');
+  if (navEl) navEl.classList.add('active');
+
+  const titles = {
+    'page-overview': 'Executive Threat Overview',
+    'page-stream': 'Live Telemetry Packet Stream',
+    'page-alerts': 'Security Alert Stream & Triage',
+    'page-incidents': 'Incident Log & Response Management',
+    'page-csv': 'CSV Batch Telemetry Ingestion & Analysis',
+    'page-reports': 'Security Report & PDF Generator',
+    'page-analytics': 'Attacker Telemetry & Threat Analytics',
+    'page-health': 'Model Diagnostics & System Health'
+  };
+  document.getElementById('page-title').textContent = titles[pageId] || 'SIEM Console';
+
+  if (pageId === 'page-reports') fetchReportData();
+}
+
+/* ---------------- CLOCK ---------------- */
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB', { hour12: false }) + ' UTC';
+}, 1000);
+
+/* ---------------- TOASTS ---------------- */
+function showToast(msg) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+/* ---------------- RADAR CHART ---------------- */
+const radarCanvas = document.getElementById('radar');
+const rctx = radarCanvas.getContext('2d');
+let sweepAngle = 0;
+
+function drawRadar() {
+  const cx = 95, cy = 95, R = 80;
+  rctx.clearRect(0, 0, 190, 190);
+
+  rctx.strokeStyle = 'rgba(89,123,121,0.25)';
+  rctx.lineWidth = 1;
+  for (let r = R / 3; r <= R; r += R / 3) {
+    rctx.beginPath(); rctx.arc(cx, cy, r, 0, Math.PI * 2); rctx.stroke();
+  }
+  for (let i = 0; i < 8; i++) {
+    const a = (Math.PI * 2 / 8) * i;
+    rctx.beginPath(); rctx.moveTo(cx, cy);
+    rctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    rctx.stroke();
+  }
+
+  const total = Object.values(threatCounts).reduce((a, b) => a + b, 0) || 1;
+  let start = -Math.PI / 2;
+  Object.keys(threatCounts).forEach(cat => {
+    const count = threatCounts[cat] || (cat === 'Normal' ? 1 : 0);
+    const sweep = (count / total) * Math.PI * 2;
+    const color = THREAT_COLORS[cat] || '#00FF9D';
+    rctx.beginPath(); rctx.moveTo(cx, cy); rctx.arc(cx, cy, R, start, start + sweep); rctx.closePath();
+    rctx.fillStyle = color + '22'; rctx.fill(); rctx.strokeStyle = color + '66'; rctx.stroke();
+    start += sweep;
+  });
+
+  rctx.save();
+  rctx.beginPath(); rctx.moveTo(cx, cy);
+  rctx.lineTo(cx + Math.cos(sweepAngle) * R, cy + Math.sin(sweepAngle) * R);
+  rctx.strokeStyle = '#00FF9D'; rctx.lineWidth = 2; rctx.shadowColor = '#00FF9D'; rctx.shadowBlur = 8;
+  rctx.stroke(); rctx.restore();
+
+  rctx.beginPath(); rctx.arc(cx, cy, 3, 0, Math.PI * 2); rctx.fillStyle = '#00FF9D'; rctx.fill();
+  sweepAngle += 0.035;
+  requestAnimationFrame(drawRadar);
+}
+drawRadar();
+
+function updateRadarLegend() {
+  const el = document.getElementById('radar-legend');
+  const total = Object.values(threatCounts).reduce((a, b) => a + b, 0) || 1;
+  el.innerHTML = Object.keys(threatCounts).map(cat => `
+    <div style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:6px;">
+      <span style="width:10px; height:10px; border-radius:2px; background:${THREAT_COLORS[cat]}"></span>
+      <span style="flex:1;">${cat}</span>
+      <span class="mono" style="color:var(--dim);">${((threatCounts[cat]/total)*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+}
+updateRadarLegend();
+
+/* ---------------- FLOW RATE CALCULATION ---------------- */
+setInterval(() => {
+  const now = Date.now();
+  flowRateWindow = flowRateWindow.filter(t => now - t < 1000);
+  document.getElementById('flow-rate').textContent = flowRateWindow.length;
+}, 500);
+
+/* ---------------- REST API INTEGRATION ---------------- */
+async function fetchHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/api/health`);
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('model-name').textContent = data.model || 'XGBoost-v1';
+    }
+  } catch (e) {}
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch(`${API_BASE}/api/stats`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('stat-active').textContent = data.open_incidents || 0;
+    document.getElementById('nav-count-incidents').textContent = data.open_incidents || 0;
+
+    const list = data.top_attacker_ips || [];
+    ['overview-top-ips', 'analytics-top-ips'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (list.length === 0) {
+        el.innerHTML = `<li style="color:var(--dim); font-size:11px;">No malicious IPs recorded yet</li>`;
+      } else {
+        const max = Math.max(...list.map(i => i.count), 1);
+        el.innerHTML = list.map(item => `
+          <li>
+            <span class="ip">${item.ip}</span>
+            <span class="bar-track"><span class="bar-fill" style="width:${(item.count/max*100)}%"></span></span>
+            <span class="n">${item.count}</span>
+          </li>
+        `).join('');
+      }
+    });
+  } catch (e) {}
+}
+
+async function loadIncidents() {
+  try {
+    const res = await fetch(`${API_BASE}/api/incidents?limit=100`);
+    if (!res.ok) return;
+    incidentList = await res.json();
+    renderIncidentsTable();
+  } catch (e) {}
+}
+
+function renderIncidentsTable() {
+  const tbody = document.getElementById('incident-table-body');
+  const search = document.getElementById('incident-search').value.toLowerCase();
+
+  let filtered = incidentList.filter(i => {
+    if (currentIncidentFilter !== 'all' && i.status !== currentIncidentFilter) return false;
+    if (search && !i.src_ip.toLowerCase().includes(search) && !i.threat_type.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="color:var(--dim); text-align:center; padding:24px;">No incidents found matching criteria.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(inc => {
+    const timeStr = inc.timestamp ? new Date(inc.timestamp).toLocaleTimeString('en-GB', { hour12: false }) : '--';
+    const confPct = Math.round((inc.confidence || 0) * 100);
+    const sev = inc.severity || 'medium';
+    return `
+      <tr>
+        <td>#${inc.id}</td>
+        <td>${timeStr}</td>
+        <td>${inc.src_ip}</td>
+        <td>${inc.dst_ip}:${inc.dst_port}</td>
+        <td><span style="color:${THREAT_COLORS[inc.threat_type] || 'var(--text)'}">${inc.threat_type}</span></td>
+        <td><span class="conf-bar"><span class="conf-fill" style="width:${confPct}%"></span></span>${confPct}%</td>
+        <td><span class="badge ${sev}">${sev}</span></td>
+        <td>${inc.correlated ? '<span style="color:var(--red);">YES</span>' : 'NO'}</td>
+        <td>
+          <select class="status-select" onchange="updateIncidentStatus(${inc.id}, this.value)">
+            <option value="open" ${inc.status === 'open' ? 'selected' : ''}>open</option>
+            <option value="investigating" ${inc.status === 'investigating' ? 'selected' : ''}>investigating</option>
+            <option value="resolved" ${inc.status === 'resolved' ? 'selected' : ''}>resolved</option>
+          </select>
+        </td>
+        <td><input type="text" value="${inc.analyst_notes || ''}" placeholder="Add note..." style="background:none; border:none; color:var(--dim); width:120px; font-family:inherit; font-size:11px;" onchange="updateIncidentNotes(${inc.id}, this.value)"></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function updateIncidentStatus(id, status) {
+  try {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) {
+      showToast(`Incident #${id} updated to ${status}`);
+      fetchStats();
+      loadIncidents();
+    }
+  } catch (e) {}
+}
+
+async function updateIncidentNotes(id, analyst_notes) {
+  try {
+    await fetch(`${API_BASE}/api/incidents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analyst_notes })
+    });
+    showToast(`Saved note for Incident #${id}`);
+  } catch (e) {}
+}
+
+function filterIncidents(filter, btn) {
+  currentIncidentFilter = filter;
+  btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderIncidentsTable();
+}
+
+/* ---------------- REPORT & PDF GENERATION ---------------- */
+async function fetchReportData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/report-data`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById('rpt-date').textContent = new Date(data.generated_at || Date.now()).toUTCString();
+    document.getElementById('rpt-model').textContent = data.model || 'XGBoost-v1';
+    document.getElementById('rpt-analyst').textContent = sessionStorage.getItem('sentry_user') || 'Tier-3 SOC Analyst';
+
+    const s = data.summary || {};
+    document.getElementById('rpt-stat-total').textContent = (s.total_incidents || 0).toLocaleString();
+    document.getElementById('rpt-stat-open').textContent = (s.open_incidents || 0).toLocaleString();
+    document.getElementById('rpt-stat-resolved').textContent = (s.resolved_incidents || 0).toLocaleString();
+
+    // Breakdown Table
+    const byType = data.by_type || {};
+    const totalInc = s.total_incidents || 1;
+    const bBody = document.getElementById('rpt-table-breakdown');
+    bBody.innerHTML = Object.keys(byType).map(cat => {
+      const c = byType[cat];
+      const pct = ((c / totalInc) * 100).toFixed(1);
+      const risk = cat === 'Botnet C2' || cat === 'DDoS' ? 'CRITICAL' : (cat === 'Brute Force' || cat === 'Port Scan' ? 'HIGH' : 'LOW');
+      return `<tr><td><strong>${cat}</strong></td><td>${c}</td><td>${pct}%</td><td>${risk}</td></tr>`;
+    }).join('') || '<tr><td colspan="4">No threat data logged yet</td></tr>';
+
+    // Top Attacker IPs Table
+    const ips = data.top_attacker_ips || [];
+    const ipBody = document.getElementById('rpt-table-ips');
+    ipBody.innerHTML = ips.map(i => `<tr><td>${i.ip}</td><td>${i.count} flows</td><td>Distributed Vector</td></tr>`).join('') || '<tr><td colspan="3">No attacker IPs logged</td></tr>';
+
+    // Recent Incidents Table
+    const rInc = data.recent_incidents || [];
+    const incBody = document.getElementById('rpt-table-incidents');
+    incBody.innerHTML = rInc.slice(0, 10).map(i => `
+      <tr>
+        <td>#${i.id}</td>
+        <td>${i.timestamp ? new Date(i.timestamp).toLocaleTimeString() : '--'}</td>
+        <td>${i.src_ip}</td>
+        <td>${i.dst_ip}:${i.dst_port}</td>
+        <td>${i.threat_type}</td>
+        <td>${i.severity}</td>
+        <td>${i.status}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">No recent incidents</td></tr>';
+
+  } catch (e) {}
+}
+
+function exportPDFReport() {
+  fetchReportData();
+  showToast('Opening PDF Export / Print Dialog...');
+  setTimeout(() => window.print(), 500);
+}
+
+/* ---------------- CSV BATCH ANALYSIS ---------------- */
+async function uploadCSVFile(file) {
+  if (!file) return;
+  showToast(`Ingesting ${file.name}... Running XGBoost classifier.`);
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/upload-csv`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.error) {
+      showToast(`CSV Error: ${data.error}`);
+      return;
+    }
+
+    showToast(`Successfully analyzed ${data.total_rows} rows from ${data.filename}!`);
+    renderCSVResults(data);
+    fetchStats();
+    loadIncidents();
+  } catch (e) {
+    showToast(`Upload failed: ${e.message}`);
+  }
+}
+
+function renderCSVResults(data) {
+  document.getElementById('csv-results-area').style.display = 'flex';
+  document.getElementById('csv-stat-total').textContent = data.total_rows.toLocaleString();
+  document.getElementById('csv-stat-malicious').textContent = data.malicious_rows.toLocaleString();
+  document.getElementById('csv-stat-normal').textContent = (data.total_rows - data.malicious_rows).toLocaleString();
+  document.getElementById('csv-stat-ratio').textContent = ((data.malicious_rows / (data.total_rows || 1)) * 100).toFixed(1) + '%';
+
+  const tbody = document.getElementById('csv-results-body');
+  tbody.innerHTML = (data.results || []).map(r => `
+    <tr>
+      <td>#${r.row}</td>
+      <td>${r.src_ip}</td>
+      <td>${r.dst_ip}:${r.dst_port}</td>
+      <td><span style="color:${THREAT_COLORS[r.threat_type] || 'var(--text)'}">${r.threat_type}</span></td>
+      <td><span class="conf-bar"><span class="conf-fill" style="width:${Math.round(r.confidence*100)}%"></span></span>${Math.round(r.confidence*100)}%</td>
+      <td><span class="badge ${r.severity}">${r.severity}</span></td>
+      <td style="color:var(--dim);">${r.suggested_action}</td>
+    </tr>
+  `).join('');
+}
+
+/* ---------------- STREAMING & WEBSOCKET ---------------- */
+function pushFeedEvent(event) {
+  if (streamPaused) return;
+
+  totalFlows++;
+  flowRateWindow.push(Date.now());
+  document.getElementById('stat-flows').textContent = totalFlows.toLocaleString();
+  document.getElementById('nav-count-flows').textContent = totalFlows.toLocaleString();
+  document.getElementById('stream-total-count').textContent = totalFlows.toLocaleString() + ' flows captured';
+
+  const cat = event.threat_type || 'Normal';
+  if (threatCounts[cat] !== undefined) threatCounts[cat]++;
+  updateRadarLegend();
+
+  // Dynamic rolling window of recent 25 flows for real-time Threat Level Meter
+  if (!window.recentFlowWeights) window.recentFlowWeights = [];
+  let flowWeight = 5;
+  if (cat === 'Port Scan') flowWeight = 45;
+  else if (cat === 'Brute Force') flowWeight = 65;
+  else if (cat === 'DDoS') flowWeight = 85;
+  else if (cat === 'Botnet C2') flowWeight = 100;
+  if (event.severity === 'critical' || event.correlated) flowWeight = 100;
+
+  window.recentFlowWeights.push(flowWeight);
+  if (window.recentFlowWeights.length > 25) window.recentFlowWeights.shift();
+
+  const threatLevel = Math.min(100, Math.max(10, Math.round(
+    window.recentFlowWeights.reduce((a, b) => a + b, 0) / window.recentFlowWeights.length
+  )));
+
+  const valEl = document.getElementById('threat-level-val');
+  const labelEl = document.getElementById('threat-level-label');
+  const fillEl = document.getElementById('threat-meter-fill');
+  valEl.textContent = threatLevel;
+  fillEl.style.width = threatLevel + '%';
+  if (threatLevel < 35) {
+    labelEl.textContent = 'LOW'; labelEl.style.color = 'var(--phos)'; fillEl.style.background = 'var(--phos)';
+  } else if (threatLevel < 65) {
+    labelEl.textContent = 'MODERATE'; labelEl.style.color = 'var(--amber)'; fillEl.style.background = 'var(--amber)';
+  } else {
+    labelEl.textContent = 'CRITICAL'; labelEl.style.color = 'var(--red)'; fillEl.style.background = 'var(--red)';
+  }
+
+  const timeStr = new Date(event.timestamp).toLocaleTimeString('en-GB', { hour12: false });
+  const sev = event.severity || 'low';
+
+  const overviewBody = document.getElementById('overview-feed-body');
+  const miniRow = document.createElement('tr');
+  miniRow.className = 'feed-row-anim';
+  miniRow.innerHTML = `
+    <td>${timeStr}</td>
+    <td>${event.src_ip}</td>
+    <td>${event.dst_ip}:${event.dst_port}</td>
+    <td>${(event.protocol || 'TCP').toUpperCase()}</td>
+    <td><span style="color:${THREAT_COLORS[cat]}">${cat}</span></td>
+    <td><span class="badge ${sev}">${sev}</span></td>
+  `;
+  overviewBody.prepend(miniRow);
+  while (overviewBody.children.length > 8) overviewBody.removeChild(overviewBody.lastChild);
+
+  if (selectedProtocol === 'ALL' || (event.protocol || 'tcp').toUpperCase() === selectedProtocol) {
+    const fullBody = document.getElementById('full-stream-body');
+    const fullRow = document.createElement('tr');
+    fullRow.className = 'feed-row-anim';
+    fullRow.innerHTML = `
+      <td>${timeStr}</td>
+      <td>${event.src_ip}</td>
+      <td>${event.dst_ip}</td>
+      <td>${event.dst_port}</td>
+      <td>${(event.protocol || 'TCP').toUpperCase()}</td>
+      <td><span style="color:${THREAT_COLORS[cat]}">${cat}</span></td>
+      <td><span class="conf-bar"><span class="conf-fill" style="width:${Math.round(event.confidence*100)}%"></span></span>${Math.round(event.confidence*100)}%</td>
+      <td><span class="badge ${sev}">${sev}</span></td>
+      <td style="color:var(--dim);">${event.suggested_action || 'Monitor'}</td>
+    `;
+    fullBody.prepend(fullRow);
+    while (fullBody.children.length > 60) fullBody.removeChild(fullBody.lastChild);
+  }
+
+  if (cat !== 'Normal') {
+    pushAlert(event);
+    fetchStats();
+    loadIncidents();
+  }
+}
+
+function pushAlert(event) {
+  openAlerts++;
+  document.getElementById('nav-count-alerts').textContent = openAlerts;
+
+  const grid = document.getElementById('full-alerts-grid');
+  if (grid.children.length === 1 && grid.children[0].textContent.includes('No active')) {
+    grid.innerHTML = '';
+  }
+
+  const sev = event.severity || 'high';
+  const card = document.createElement('div');
+  card.className = `alert-card ${sev}`;
+  card.dataset.sev = sev;
+  const timeStr = new Date(event.timestamp).toLocaleTimeString('en-GB', { hour12: false });
+
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-weight:600; color:var(--text);">${event.threat_type} ${event.correlated ? '<span style="color:var(--red); font-size:10px;">(CORRELATED)</span>' : ''}</span>
+      <span class="badge ${sev}">${sev}</span>
+    </div>
+    <div class="mono" style="font-size:11px; color:var(--dim);">${event.src_ip} &rarr; ${event.dst_ip}:${event.dst_port} · ${timeStr}</div>
+    <div style="font-size:11.5px; color:var(--amber);">Suggested: ${event.suggested_action || 'Review traffic'}</div>
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button class="btn btn-danger" onclick="blockIP('${event.src_ip}', this)">Block IP</button>
+      <button class="btn" onclick="ackAlert(this)">Acknowledge</button>
+    </div>
+  `;
+
+  grid.prepend(card);
+  while (grid.children.length > 30) grid.removeChild(grid.lastChild);
+}
+
+function blockIP(ip, btn) {
+  blockedIPs.add(ip);
+  document.getElementById('stat-blocked').textContent = blockedIPs.size;
+  showToast(`IP ${ip} blocked at firewall perimeter.`);
+  ackAlert(btn);
+}
+
+function ackAlert(btn) {
+  const card = btn.closest('.alert-card');
+  if (card) {
+    card.style.opacity = '0.35'; card.style.pointerEvents = 'none';
+    openAlerts = Math.max(0, openAlerts - 1);
+    document.getElementById('nav-count-alerts').textContent = openAlerts;
+  }
+}
+
+function filterAlerts(filter, btn) {
+  currentAlertFilter = filter;
+  btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.querySelectorAll('#full-alerts-grid .alert-card').forEach(card => {
+    if (filter === 'all' || card.dataset.sev === filter) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+function toggleStreamPause() {
+  streamPaused = !streamPaused;
+  const btn = document.getElementById('btn-pause-stream');
+  btn.textContent = streamPaused ? 'Resume Stream' : 'Pause Stream';
+  btn.classList.toggle('active', !streamPaused);
+}
+
+function clearStream() {
+  document.getElementById('full-stream-body').innerHTML = '';
+  showToast('Stream buffer cleared.');
+}
+
+function filterProtocol(proto, btn) {
+  selectedProtocol = proto;
+  btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ---------------- WEBSOCKET CONNECTION ---------------- */
+function connectWebSocket() {
+  const pDot = document.getElementById('pipeline-dot');
+  const pStatus = document.getElementById('pipeline-status');
+
+  pDot.className = 'dot amber'; pStatus.textContent = 'CONNECTING...';
+  socket = new WebSocket(WS_URL);
+
+  socket.onopen = () => {
+    pDot.className = 'dot green'; pStatus.textContent = 'STREAMING';
+    fetchHealth(); fetchStats(); loadIncidents();
+  };
+
+  socket.onmessage = (msg) => {
+    try {
+      const data = JSON.parse(msg.data);
+      if (data.type === 'flow') pushFeedEvent(data);
+    } catch (e) {}
+  };
+
+  socket.onclose = () => {
+    pDot.className = 'dot red'; pStatus.textContent = 'DISCONNECTED';
+    setTimeout(connectWebSocket, 3000);
+  };
+}
+
+function initApp() {
+  fetchHealth();
+  fetchStats();
+  loadIncidents();
+  connectWebSocket();
+}
+</script>
+</body>
+</html>

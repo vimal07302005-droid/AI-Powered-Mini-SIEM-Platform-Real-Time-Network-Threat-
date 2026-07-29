@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.env
+
+# SQLite Database
+backend/sentry.db
+
+# Model binaries (optional: uncomment if file size is >100MB)
+# models/*.joblib
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
