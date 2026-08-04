@@ -126,17 +126,41 @@ classifier: ThreatClassifier | None = None
 
 # ------------------------------------------------------- simulated stream --
 def load_replay_pool():
-    """Loads test-set rows to replay as a simulated live stream. In production,
-    swap this generator for a Scapy/tshark capture that emits the same feature
-    schema per flow."""
+    """Loads test-set rows balanced with ~85% normal traffic and ~15% threat attacks
+    for realistic enterprise network flow monitoring."""
     path = os.path.join(DATA_DIR, "KDDTest.csv")
     cols = classifier.feature_columns + ["label", "difficulty"]
     df = pd.read_csv(path, names=cols)
-    return df.sample(frac=1, random_state=None).to_dict("records")
+
+    df_normal = df[df["label"].astype(str).str.startswith("normal")]
+    df_attack = df[~df["label"].astype(str).str.startswith("normal")]
+
+    n_norm = min(850, len(df_normal))
+    n_att = min(150, len(df_attack))
+
+    df_balanced = pd.concat([
+        df_normal.sample(n=n_norm, random_state=42),
+        df_attack.sample(n=n_att, random_state=42)
+    ]).sample(frac=1, random_state=None)
+    return df_balanced.to_dict("records")
 
 
-def random_ip():
-    return ".".join(str(random.randint(1, 254)) for _ in range(4))
+STREAM_ENABLED = True
+
+REALISTIC_IP_POOLS = {
+    "Normal": ["192.168.1.105", "192.168.1.142", "10.0.4.15", "172.16.0.22"],
+    "DDoS": ["198.51.100.44", "203.0.113.88", "45.33.32.19", "185.220.101.5"],
+    "Port Scan": ["185.220.101.45", "193.27.228.12", "93.184.216.34"],
+    "Brute Force": ["192.0.2.77", "198.51.100.91", "203.0.113.140"],
+    "Botnet C2": ["45.33.32.100", "185.220.101.99"],
+}
+
+
+def get_traffic_ip(category: str) -> tuple[str, str]:
+    pool = REALISTIC_IP_POOLS.get(category, ["192.168.1.100"])
+    src_ip = random.choice(pool)
+    dst_ip = "10.0.0.1"  # Fixed Protected Internal Gateway IP
+    return src_ip, dst_ip
 
 
 # rolling window per source IP for simple correlation rules
@@ -193,6 +217,15 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+MITRE_ATTACK_MAP = {
+    "DDoS": "T1498 (Network Denial of Service)",
+    "Port Scan": "T1595.002 (Reconnaissance: Vulnerability Scanning)",
+    "Brute Force": "T1110 (Credential Access: Brute Force)",
+    "Botnet C2": "T1071 (Application Layer Command & Control)",
+    "Normal": "N/A (Benign Operation)",
+}
+
+
 async def stream_loop():
     """Background task: pulls a row from the replay pool every ~0.8-1.5s,
     classifies it, runs the rules engine, stores incidents for non-Normal
@@ -200,15 +233,24 @@ async def stream_loop():
     pool = load_replay_pool()
     i = 0
     while True:
+        if not STREAM_ENABLED:
+            await asyncio.sleep(1)
+            continue
+
         row = pool[i % len(pool)]
         i += 1
         features = {k: row[k] for k in classifier.feature_columns}
         category, confidence = classifier.predict(features)
 
-        src_ip, dst_ip, dst_port = random_ip(), random_ip(), random.randint(20, 9999)
+        src_ip, dst_ip = get_traffic_ip(category)
+        dst_port = 80 if category == "DDoS" else (22 if category == "Brute Force" else random.choice([80, 443, 22, 21, 8080]))
         base_severity = SEVERITY_BY_CATEGORY.get(category, "medium")
         severity, correlated = apply_rules_engine(category, base_severity, src_ip)
         ts = datetime.now(timezone.utc).isoformat()
+
+        risk_score = 10 if category == "Normal" else (45 if category == "Port Scan" else (65 if category == "Brute Force" else (85 if category == "DDoS" else 95)))
+        if correlated:
+            risk_score = 100
 
         event = {
             "type": "flow",
@@ -220,6 +262,8 @@ async def stream_loop():
             "threat_type": category,
             "confidence": round(confidence, 4),
             "severity": severity,
+            "risk_score": risk_score,
+            "mitre_attack": MITRE_ATTACK_MAP.get(category, "T1498"),
             "correlated": correlated,
             "suggested_action": ACTION_SUGGESTIONS[severity],
         }
@@ -329,6 +373,15 @@ def update_incident(incident_id: int, update: IncidentUpdate):
     return dict(row) if row else {"error": "not found"}
 
 
+@app.delete("/api/incidents")
+def clear_incidents():
+    conn = get_conn()
+    conn.execute("DELETE FROM incidents")
+    conn.commit()
+    conn.close()
+    return {"status": "success", "message": "All incident records cleared."}
+
+
 @app.get("/api/stats")
 def stats():
     conn = get_conn()
@@ -417,9 +470,9 @@ async def upload_csv(file: UploadFile = File(...)):
     for idx, (cat, conf) in enumerate(zip(categories, confidences)):
         by_type[cat] += 1
         base_sev = SEVERITY_BY_CATEGORY.get(cat, "medium")
-        src_ip = random_ip()
-        dst_ip = random_ip()
-        dst_port = random.randint(20, 9999)
+        src_ip = str(df.iloc[idx]["src_ip"]) if "src_ip" in df.columns else get_traffic_ip(cat)[0]
+        dst_ip = str(df.iloc[idx]["dst_ip"]) if "dst_ip" in df.columns else "10.0.0.1"
+        dst_port = int(df.iloc[idx]["dst_port"]) if "dst_port" in df.columns else random.randint(20, 9999)
 
         item = {
             "row": idx + 1,
