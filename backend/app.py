@@ -242,10 +242,16 @@ MITRE_ATTACK_MAP = {
 }
 
 
+USE_LIVE_CAPTURE = os.getenv("USE_LIVE_CAPTURE", "false").lower() in ("true", "1", "yes")
+
+live_tracker = None
+live_thread = None
+
+
 async def stream_loop():
-    """Background task: pulls a row from the replay pool every ~0.8-1.5s,
-    classifies it, runs the rules engine, stores incidents for non-Normal
-    traffic, and broadcasts every event to connected dashboards."""
+    """Background task: processes live captured packets (if USE_LIVE_CAPTURE=true)
+    or pulls rows from the replay pool (~0.8-1.5s), classifies each flow, runs rules
+    engine, stores incidents for threats, and broadcasts events to dashboard."""
     pool = load_replay_pool()
     i = 0
     while True:
@@ -253,13 +259,29 @@ async def stream_loop():
             await asyncio.sleep(1)
             continue
 
-        row = pool[i % len(pool)]
-        i += 1
-        features = {k: row[k] for k in classifier.feature_columns}
-        category, confidence = classifier.predict(features)
+        live_flow = None
+        if USE_LIVE_CAPTURE and live_tracker:
+            try:
+                live_flow = live_tracker.completed_queue.get_nowait()
+            except Exception:
+                live_flow = None
 
-        src_ip, dst_ip = get_traffic_ip(category)
-        dst_port = 80 if category == "DDoS" else (22 if category == "Brute Force" else random.choice([80, 443, 22, 21, 8080]))
+        if live_flow:
+            features = {k: live_flow.get(k, 0) for k in classifier.feature_columns}
+            category, confidence = classifier.predict(features)
+            src_ip = live_flow.get("src_ip", "127.0.0.1")
+            dst_ip = live_flow.get("dst_ip", "10.0.0.1")
+            dst_port = live_flow.get("dst_port", 80)
+            protocol = live_flow.get("protocol_type", "tcp")
+        else:
+            row = pool[i % len(pool)]
+            i += 1
+            features = {k: row[k] for k in classifier.feature_columns}
+            category, confidence = classifier.predict(features)
+            src_ip, dst_ip = get_traffic_ip(category)
+            dst_port = 80 if category == "DDoS" else (22 if category == "Brute Force" else random.choice([80, 443, 22, 21, 8080]))
+            protocol = row.get("protocol_type", "tcp")
+
         base_severity = SEVERITY_BY_CATEGORY.get(category, "medium")
         severity, correlated = apply_rules_engine(category, base_severity, src_ip)
         ts = datetime.now(timezone.utc).isoformat()
@@ -274,7 +296,7 @@ async def stream_loop():
             "src_ip": src_ip,
             "dst_ip": dst_ip,
             "dst_port": dst_port,
-            "protocol": row.get("protocol_type", "tcp"),
+            "protocol": protocol,
             "threat_type": category,
             "confidence": round(confidence, 4),
             "severity": severity,
@@ -298,17 +320,31 @@ async def stream_loop():
         conn.close()
 
         await manager.broadcast(event)
-        await asyncio.sleep(random.uniform(0.5, 1.4))
+        await asyncio.sleep(random.uniform(0.5, 1.4) if not live_flow else 0.05)
 
 
 # ------------------------------------------------------------------ app ----
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global classifier
+    global classifier, live_tracker, live_thread
     init_db()
     classifier = ThreatClassifier()
+
+    if USE_LIVE_CAPTURE:
+        try:
+            from live_capture import LiveFlowTracker, LiveCaptureSnifferThread
+            live_tracker = LiveFlowTracker()
+            live_thread = LiveCaptureSnifferThread(live_tracker)
+            live_thread.start()
+            print("[LIVE CAPTURE] Scapy sniffer thread started on active interface.")
+        except Exception as e:
+            print(f"[LIVE CAPTURE WARNING] Failed to start Scapy sniffer: {e}")
+            print("[LIVE CAPTURE WARNING] Falling back to simulated replay pool.")
+
     task = asyncio.create_task(stream_loop())
     yield
+    if live_thread:
+        live_thread.stop()
     task.cancel()
 
 
