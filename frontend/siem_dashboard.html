@@ -1114,11 +1114,35 @@ drawRadar();
 function updateRadarLegend() {
   const el = document.getElementById('radar-legend');
   const total = Object.values(threatCounts).reduce((a, b) => a + b, 0) || 1;
-  el.innerHTML = Object.keys(threatCounts).map(cat => `
+  const categories = Object.keys(threatCounts);
+  
+  let roundedPct = {};
+  let largestCat = categories[0];
+  let maxCount = -1;
+
+  categories.forEach(cat => {
+    const count = threatCounts[cat] || 0;
+    if (count > maxCount) {
+      maxCount = count;
+      largestCat = cat;
+    }
+    roundedPct[cat] = Math.round((count / total) * 100);
+  });
+
+  // Balance largest category so all category percentages sum to exactly 100%
+  let sumOthers = 0;
+  categories.forEach(cat => {
+    if (cat !== largestCat) {
+      sumOthers += roundedPct[cat];
+    }
+  });
+  roundedPct[largestCat] = Math.max(0, 100 - sumOthers);
+
+  el.innerHTML = categories.map(cat => `
     <div style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:6px;">
       <span style="width:10px; height:10px; border-radius:2px; background:${THREAT_COLORS[cat]}"></span>
       <span style="flex:1;">${cat}</span>
-      <span class="mono" style="color:var(--dim);">${((threatCounts[cat]/total)*100).toFixed(0)}%</span>
+      <span class="mono" style="color:var(--dim);">${roundedPct[cat]}%</span>
     </div>
   `).join('');
 }
@@ -1149,6 +1173,15 @@ async function fetchStats() {
     const data = await res.json();
     document.getElementById('stat-active').textContent = data.open_incidents || 0;
     document.getElementById('nav-count-incidents').textContent = data.open_incidents || 0;
+
+    // Sync total flows classified from server counter
+    if (data.total_flows_classified !== undefined) {
+      if (data.total_flows_classified > totalFlows) {
+        totalFlows = data.total_flows_classified;
+      }
+    }
+    document.getElementById('stat-flows').textContent = totalFlows.toLocaleString();
+    document.getElementById('nav-count-flows').textContent = totalFlows.toLocaleString();
 
     const list = data.top_attacker_ips || [];
     ['overview-top-ips', 'analytics-top-ips'].forEach(id => {

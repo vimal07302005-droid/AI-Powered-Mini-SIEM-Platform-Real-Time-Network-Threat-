@@ -71,6 +71,13 @@ def init_db():
             correlated INTEGER DEFAULT 0
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_stats (
+            key TEXT PRIMARY KEY,
+            value INTEGER NOT NULL
+        )
+    """)
+    conn.execute("INSERT OR IGNORE INTO system_stats (key, value) VALUES ('total_flows_classified', 0)")
     conn.commit()
     conn.close()
 
@@ -155,11 +162,20 @@ REALISTIC_IP_POOLS = {
     "Botnet C2": ["45.33.32.100", "185.220.101.99"],
 }
 
+DESTINATION_IP_POOL = [
+    "10.0.0.1",
+    "10.0.0.5",
+    "10.0.1.12",
+    "10.0.2.44",
+    "10.0.3.15",
+    "10.0.5.60",
+]
+
 
 def get_traffic_ip(category: str) -> tuple[str, str]:
     pool = REALISTIC_IP_POOLS.get(category, ["192.168.1.100"])
     src_ip = random.choice(pool)
-    dst_ip = "10.0.0.1"  # Fixed Protected Internal Gateway IP
+    dst_ip = random.choice(DESTINATION_IP_POOL)
     return src_ip, dst_ip
 
 
@@ -268,8 +284,9 @@ async def stream_loop():
             "suggested_action": ACTION_SUGGESTIONS[severity],
         }
 
+        conn = get_conn()
+        conn.execute("UPDATE system_stats SET value = value + 1 WHERE key='total_flows_classified'")
         if category != "Normal":
-            conn = get_conn()
             cur = conn.execute(
                 """INSERT INTO incidents
                    (timestamp, src_ip, dst_ip, dst_port, threat_type, confidence, severity, status, correlated)
@@ -277,8 +294,8 @@ async def stream_loop():
                 (ts, src_ip, dst_ip, dst_port, category, confidence, severity, "open", int(correlated)),
             )
             event["incident_id"] = cur.lastrowid
-            conn.commit()
-            conn.close()
+        conn.commit()
+        conn.close()
 
         await manager.broadcast(event)
         await asyncio.sleep(random.uniform(0.5, 1.4))
@@ -314,7 +331,7 @@ class LoginRequest(BaseModel):
     password: str
 
 
-@app.post("/api/login")
+@app.post("/api/auth/login")
 def login(req: LoginRequest):
     if req.username and req.password:
         return {
@@ -377,9 +394,11 @@ def update_incident(incident_id: int, update: IncidentUpdate):
 def clear_incidents():
     conn = get_conn()
     conn.execute("DELETE FROM incidents")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='incidents'")
+    conn.execute("UPDATE system_stats SET value = 0 WHERE key='total_flows_classified'")
     conn.commit()
     conn.close()
-    return {"status": "success", "message": "All incident records cleared."}
+    return {"status": "success", "message": "All incident records cleared and sequence reset to #1."}
 
 
 @app.get("/api/stats")
@@ -387,6 +406,12 @@ def stats():
     conn = get_conn()
     total = conn.execute("SELECT COUNT(*) c FROM incidents").fetchone()["c"]
     open_ = conn.execute("SELECT COUNT(*) c FROM incidents WHERE status='open'").fetchone()["c"]
+    total_flows_row = conn.execute("SELECT value FROM system_stats WHERE key='total_flows_classified'").fetchone()
+    total_flows = total_flows_row["value"] if total_flows_row else 0
+    # Ensure total_flows is always >= total incidents
+    if total_flows < total:
+        total_flows = total
+
     by_type = conn.execute(
         "SELECT threat_type, COUNT(*) c FROM incidents GROUP BY threat_type"
     ).fetchall()
@@ -397,6 +422,7 @@ def stats():
     return {
         "total_incidents": total,
         "open_incidents": open_,
+        "total_flows_classified": total_flows,
         "by_type": {r["threat_type"]: r["c"] for r in by_type},
         "top_attacker_ips": [{"ip": r["src_ip"], "count": r["c"]} for r in top_ips],
     }
@@ -471,7 +497,7 @@ async def upload_csv(file: UploadFile = File(...)):
         by_type[cat] += 1
         base_sev = SEVERITY_BY_CATEGORY.get(cat, "medium")
         src_ip = str(df.iloc[idx]["src_ip"]) if "src_ip" in df.columns else get_traffic_ip(cat)[0]
-        dst_ip = str(df.iloc[idx]["dst_ip"]) if "dst_ip" in df.columns else "10.0.0.1"
+        dst_ip = str(df.iloc[idx]["dst_ip"]) if "dst_ip" in df.columns else random.choice(DESTINATION_IP_POOL)
         dst_port = int(df.iloc[idx]["dst_port"]) if "dst_port" in df.columns else random.randint(20, 9999)
 
         item = {
@@ -495,6 +521,7 @@ async def upload_csv(file: UploadFile = File(...)):
                 (now_ts, src_ip, dst_ip, dst_port, cat, conf, base_sev, "open", 0),
             )
 
+    conn.execute("UPDATE system_stats SET value = value + ? WHERE key='total_flows_classified'", (len(results),))
     conn.commit()
     conn.close()
 
